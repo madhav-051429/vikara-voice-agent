@@ -103,6 +103,26 @@ def create_event(name: str, date: str, time: str, title: str = None) -> dict:
         },
     }
 
+    # Check for conflicts before creating the event
+    try:
+        freebusy_query = {
+            'timeMin': event_start.isoformat() + '+05:30',
+            'timeMax': event_end.isoformat() + '+05:30',
+            'items': [{'id': CALENDAR_ID}]
+        }
+        freebusy_result = service.freebusy().query(body=freebusy_query).execute()
+        busy_slots = freebusy_result.get('calendars', {}).get(CALENDAR_ID, {}).get('busy', [])
+
+        if busy_slots:
+            return {
+                "success": False,
+                "error": f"That time slot is already booked. There is an existing meeting on {event_start.strftime('%B %d, %Y')} between {event_start.strftime('%I:%M %p')} and {event_end.strftime('%I:%M %p')}. Please choose a different time."
+            }
+    except Exception as e:
+        # If freebusy check fails, log it but still try to create the event
+        import logging
+        logging.getLogger(__name__).warning(f"FreeBusy check failed: {e}")
+
     try:
         created_event = service.events().insert(
             calendarId=CALENDAR_ID,
