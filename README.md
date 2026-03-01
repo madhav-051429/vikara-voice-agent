@@ -205,6 +205,20 @@ vikara-voice-agent/
 
 ## 🎯 Use Cases
 
-- **Business scheduling** — Deploy as a customer-facing appointment booking agent for clinics, salons, or consultancies
-- **Personal assistant** — Use as a personal voice scheduler to add events to your calendar
-- **Team coordination** — Extend to handle multi-calendar scheduling and availability checks
+### Business Appointment Scheduling
+
+A company (e.g., a law firm, clinic, or consultancy) deploys this voice agent on their phone line. When a **client calls in**:
+- The agent collects the client's name, preferred date/time, and meeting purpose
+- It checks the company's calendar for conflicts
+- If the slot is available, it books the appointment on the **company's Google Calendar**
+- The company sees "Meeting with [Client Name]" on their calendar and knows who's coming
+
+This eliminates the need for a receptionist to manually handle appointment scheduling.
+
+### Personal Voice Scheduler
+
+Use it as a personal assistant — call the agent and say *"Schedule a dentist appointment for next Monday at 2 PM"* and it gets added to your own Google Calendar.
+
+### Team Coordination
+
+Extend the agent to check availability across multiple team members' calendars before booking, ensuring no conflicts for group meetings.
