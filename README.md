@@ -175,21 +175,15 @@ curl http://localhost:8000/
 # → {"status": "alive", "service": "Voice Scheduling Agent"}
 ```
 
-### Step 5: Connect to VAPI (only if setting up your own instance)
+### Step 5: Set Up VAPI Assistant (only for full replication)
 
-> **Note:** If you just want to test the agent, use the [demo link](https://vapi.ai?demo=true&shareKey=2701445f-a21f-402c-b1d1-881af1ad5dbf&assistantId=fa66c2ac-b68d-4443-91f4-9a5272dd3fe2) at the top of this README. The steps below are only needed if you want to create your own voice assistant connected to your own calendar.
+> **Note:** The deployed assistant is already publicly accessible via the [demo link](https://vapi.ai?demo=true&shareKey=2701445f-a21f-402c-b1d1-881af1ad5dbf&assistantId=fa66c2ac-b68d-4443-91f4-9a5272dd3fe2). The steps below are only needed if you want to create your own assistant connected to your own backend and calendar.
 
 1. Sign up at [vapi.ai](https://vapi.ai) and create a new **Assistant**
-2. Under the **Model** tab:
-   - Set **Provider** to Google, **Model** to Gemini 2.0 Flash
-   - Add a system prompt instructing the assistant to collect name, date, time, and optional title
-3. Go to the **Tools** section → create a **Custom Tool**:
-   - **Name:** `create_calendar_event`
-   - **Server URL:** your server URL + `/api/webhook`
-   - **Parameters:** `name` (string, required), `date` (string, required), `time` (string, required), `title` (string, optional)
-4. Click **Publish** and test via the "Talk to Assistant" button
-
-> **Tip:** For local development, use [ngrok](https://ngrok.com) to expose your local server (`ngrok http 8000`) and use the ngrok URL as the tool's server URL.
+2. Set **Provider** to Google, **Model** to Gemini 2.0 Flash
+3. Add a system prompt for collecting name, date, time, and optional meeting title
+4. Create a **Custom Tool** named `create_calendar_event` with your server URL as the endpoint
+5. For local dev, use [ngrok](https://ngrok.com) (`ngrok http 8000`) to expose your local server to VAPI
 
 ---
 
