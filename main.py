@@ -9,13 +9,11 @@ from calendar_service import create_event
 
 load_dotenv()
 
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Vikara Voice Scheduling Agent")
+app = FastAPI(title="Voice Scheduling Agent")
 
-# Allow CORS (needed for VAPI to call your server)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,114 +25,90 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    """Health check endpoint."""
-    return {"status": "alive", "service": "Vikara Voice Scheduling Agent"}
+    return {"status": "alive", "service": "Voice Scheduling Agent"}
 
 
 @app.post("/api/webhook")
 async def vapi_webhook(request: Request):
-    """
-    Main webhook endpoint that VAPI calls.
-
-    VAPI sends different types of messages:
-    - tool-calls: (NEW format) When the AI wants to execute a custom tool
-    - function-call: (OLD format) Legacy function calling
-    - status-update: Call status changes
-    - end-of-call-report: Summary after call ends
-    """
+    """Handles incoming webhook requests from VAPI."""
     try:
         payload = await request.json()
-        logger.info(f"Received webhook: {json.dumps(payload, indent=2)}")
+        logger.info(f"Webhook payload: {json.dumps(payload, indent=2)}")
 
         message = payload.get("message", {})
-        message_type = message.get("type", "")
+        msg_type = message.get("type", "")
 
-        # Handle NEW tool-calls format (VAPI Tools)
-        if message_type == "tool-calls":
-            tool_call_list = message.get("toolCallList", [])
+        # VAPI Tools format (current)
+        if msg_type == "tool-calls":
+            tool_calls = message.get("toolCallList", [])
             results = []
 
-            for tool_call in tool_call_list:
-                tool_call_id = tool_call.get("id", "")
-                function_info = tool_call.get("function", {})
-                function_name = function_info.get("name", "")
-                # Arguments can be a string (JSON) or dict
-                arguments = function_info.get("arguments", {})
-                if isinstance(arguments, str):
-                    arguments = json.loads(arguments)
+            for tc in tool_calls:
+                tc_id = tc.get("id", "")
+                func = tc.get("function", {})
+                name = func.get("name", "")
+                args = func.get("arguments", {})
 
-                logger.info(f"Tool call: {function_name} with args: {arguments}")
+                # arguments might come as a JSON string
+                if isinstance(args, str):
+                    args = json.loads(args)
 
-                if function_name == "create_calendar_event":
-                    result = _handle_create_event(arguments)
-                    results.append({
-                        "toolCallId": tool_call_id,
-                        "result": result
-                    })
+                logger.info(f"Tool call: {name}, args: {args}")
+
+                if name == "create_calendar_event":
+                    result = handle_scheduling(args)
+                    results.append({"toolCallId": tc_id, "result": result})
                 else:
-                    results.append({
-                        "toolCallId": tool_call_id,
-                        "result": f"Unknown tool: {function_name}"
-                    })
+                    results.append({"toolCallId": tc_id, "result": f"Unknown tool: {name}"})
 
             return JSONResponse({"results": results})
 
-        # Handle OLD function-call format (legacy, kept for backward compatibility)
-        elif message_type == "function-call":
-            function_name = message.get("functionCall", {}).get("name", "")
-            parameters = message.get("functionCall", {}).get("parameters", {})
+        # legacy function-call format (keeping for backwards compat)
+        elif msg_type == "function-call":
+            fc = message.get("functionCall", {})
+            name = fc.get("name", "")
+            params = fc.get("parameters", {})
+            logger.info(f"Function call: {name}, params: {params}")
 
-            logger.info(f"Function call: {function_name} with params: {parameters}")
+            if name == "create_calendar_event":
+                return JSONResponse({"result": handle_scheduling(params)})
+            return JSONResponse({"result": f"Unknown function: {name}"})
 
-            if function_name == "create_calendar_event":
-                result_text = _handle_create_event(parameters)
-                return JSONResponse({"result": result_text})
-            else:
-                return JSONResponse({"result": f"Unknown function: {function_name}"})
-
-        # Handle status updates (optional — good for logging)
-        elif message_type == "status-update":
-            status = message.get("status", "")
-            logger.info(f"Call status update: {status}")
+        elif msg_type == "status-update":
+            logger.info(f"Status: {message.get('status', '')}")
             return JSONResponse({"status": "ok"})
 
-        # Handle end of call reports (optional — good for analytics)
-        elif message_type == "end-of-call-report":
-            logger.info(f"Call ended: {json.dumps(message, indent=2)}")
+        elif msg_type == "end-of-call-report":
+            logger.info("Call ended")
             return JSONResponse({"status": "ok"})
 
-        # Handle transcript updates
-        elif message_type == "transcript":
-            logger.info(f"Transcript: {message.get('transcript', '')}")
+        elif msg_type == "transcript":
             return JSONResponse({"status": "ok"})
 
         else:
-            logger.info(f"Unhandled message type: {message_type}")
+            logger.info(f"Unhandled message type: {msg_type}")
             return JSONResponse({"status": "ok"})
 
     except Exception as e:
-        logger.error(f"Webhook error: {str(e)}")
-        return JSONResponse(
-            {"result": "An internal error occurred. Please try again."},
-            status_code=500
-        )
+        logger.error(f"Webhook error: {e}")
+        return JSONResponse({"result": "Internal error. Please try again."}, status_code=500)
 
 
-def _handle_create_event(parameters: dict) -> str:
-    """Shared handler for creating calendar events (used by both tool-calls and function-call)."""
-    name = parameters.get("name", "Unknown")
-    date = parameters.get("date", "")
-    time_str = parameters.get("time", "")
-    title = parameters.get("title", None)
+def handle_scheduling(params: dict) -> str:
+    """Takes scheduling params and creates a calendar event."""
+    name = params.get("name", "Unknown")
+    date = params.get("date", "")
+    time_val = params.get("time", "")
+    title = params.get("title", None)
 
-    result = create_event(name=name, date=date, time=time_str, title=title)
+    result = create_event(name=name, date=date, time=time_val, title=title)
     logger.info(f"Calendar result: {result}")
 
     if result.get("success"):
-        return (f"I've successfully created the meeting '{result['summary']}' on {result['start']}. "
-                f"The event has been added to the calendar. Is there anything else I can help you with?")
+        return (f"Meeting '{result['summary']}' created on {result['start']}. "
+                "Is there anything else I can help with?")
     else:
-        return (f"Sorry, I couldn't create the event. {result.get('error', 'Unknown error')}.")
+        return f"Sorry, I couldn't create the event. {result.get('error', 'Unknown error')}."
 
 
 if __name__ == "__main__":

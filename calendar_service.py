@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -7,136 +8,112 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID')
 
+
 def get_calendar_service():
-    """Create and return a Google Calendar API service instance."""
+    """Builds and returns the Google Calendar API client."""
     creds_path = os.getenv('GOOGLE_CREDENTIALS_PATH', 'credentials.json')
 
-    # Support both file path and JSON string (for deployment)
     if os.path.exists(creds_path):
-        credentials = service_account.Credentials.from_service_account_file(
-            creds_path, scopes=SCOPES
-        )
+        # local dev — use the JSON file directly
+        creds = service_account.Credentials.from_service_account_file(creds_path, scopes=SCOPES)
     else:
-        # If credentials are stored as env variable (for Railway deployment)
+        # deployed (Railway) — credentials stored as env var
         creds_json = os.getenv('GOOGLE_CREDENTIALS_JSON')
-        if creds_json:
-            creds_info = json.loads(creds_json)
-            credentials = service_account.Credentials.from_service_account_info(
-                creds_info, scopes=SCOPES
-            )
-        else:
-            raise Exception("No Google credentials found")
+        if not creds_json:
+            raise Exception("No Google credentials found. Set GOOGLE_CREDENTIALS_JSON or place credentials.json")
+        creds_info = json.loads(creds_json)
+        creds = service_account.Credentials.from_service_account_info(creds_info, scopes=SCOPES)
 
-    service = build('calendar', 'v3', credentials=credentials)
-    return service
+    return build('calendar', 'v3', credentials=creds)
+
+
+def parse_date(date_str):
+    """Try common date formats, fall back to dateutil."""
+    formats = ['%Y-%m-%d', '%B %d, %Y', '%b %d, %Y', '%d/%m/%Y', '%m/%d/%Y']
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_str.strip(), fmt)
+        except ValueError:
+            continue
+    # fallback
+    from dateutil import parser
+    return parser.parse(date_str)
+
+
+def parse_time(time_str):
+    """Try common time formats, fall back to dateutil."""
+    formats = ['%H:%M', '%I:%M %p', '%I:%M%p', '%I %p', '%I%p']
+    for fmt in formats:
+        try:
+            return datetime.strptime(time_str.strip(), fmt)
+        except ValueError:
+            continue
+    from dateutil import parser
+    return parser.parse(time_str)
 
 
 def create_event(name: str, date: str, time: str, title: str = None) -> dict:
     """
-    Create a Google Calendar event.
-
-    Args:
-        name: Name of the person scheduling
-        date: Date string (e.g., "2026-03-05" or "March 5, 2026")
-        time: Time string (e.g., "14:00" or "2:00 PM")
-        title: Optional meeting title
-
-    Returns:
-        dict with event details and link
+    Creates a Google Calendar event.
+    Returns a dict with success status, event details, or error message.
     """
     service = get_calendar_service()
 
-    # Parse the date and time
     try:
-        # Try multiple date formats
-        for fmt in ['%Y-%m-%d', '%B %d, %Y', '%b %d, %Y', '%d/%m/%Y', '%m/%d/%Y']:
-            try:
-                parsed_date = datetime.strptime(date.strip(), fmt)
-                break
-            except ValueError:
-                continue
-        else:
-            # If no format matched, try a more flexible approach
-            from dateutil import parser
-            parsed_date = parser.parse(date)
+        parsed_date = parse_date(date)
+        parsed_time = parse_time(time)
 
-        # Parse time
-        for fmt in ['%H:%M', '%I:%M %p', '%I:%M%p', '%I %p', '%I%p']:
-            try:
-                parsed_time = datetime.strptime(time.strip(), fmt)
-                break
-            except ValueError:
-                continue
-        else:
-            from dateutil import parser
-            parsed_time = parser.parse(time)
-
-        # Combine date and time
-        event_start = parsed_date.replace(
-            hour=parsed_time.hour,
-            minute=parsed_time.minute
-        )
-        event_end = event_start + timedelta(hours=1)  # 1 hour default duration
-
+        start = parsed_date.replace(hour=parsed_time.hour, minute=parsed_time.minute)
+        end = start + timedelta(hours=1)
     except Exception as e:
-        return {"success": False, "error": f"Could not parse date/time: {str(e)}"}
+        return {"success": False, "error": f"Couldn't parse date/time: {e}"}
 
-    # Build the event
     meeting_title = title if title else f"Meeting with {name}"
-    event = {
+
+    event_body = {
         'summary': meeting_title,
-        'description': f'Meeting scheduled by {name} via Vikara Voice Agent',
+        'description': f'Scheduled by {name} via Voice Agent',
         'start': {
-            'dateTime': event_start.isoformat(),
+            'dateTime': start.isoformat(),
             'timeZone': 'Asia/Kolkata',
         },
         'end': {
-            'dateTime': event_end.isoformat(),
+            'dateTime': end.isoformat(),
             'timeZone': 'Asia/Kolkata',
         },
-        'attendees': [],
-        'reminders': {
-            'useDefault': True,
-        },
+        'reminders': {'useDefault': True},
     }
 
-    # Check for conflicts before creating the event
+    # check if the slot is already taken
     try:
-        freebusy_query = {
-            'timeMin': event_start.isoformat() + '+05:30',
-            'timeMax': event_end.isoformat() + '+05:30',
+        freebusy = service.freebusy().query(body={
+            'timeMin': start.isoformat() + '+05:30',
+            'timeMax': end.isoformat() + '+05:30',
             'items': [{'id': CALENDAR_ID}]
-        }
-        freebusy_result = service.freebusy().query(body=freebusy_query).execute()
-        busy_slots = freebusy_result.get('calendars', {}).get(CALENDAR_ID, {}).get('busy', [])
+        }).execute()
 
-        if busy_slots:
-            return {
-                "success": False,
-                "error": "That time slot is already booked. Please choose a different time."
-            }
+        busy = freebusy.get('calendars', {}).get(CALENDAR_ID, {}).get('busy', [])
+        if busy:
+            return {"success": False, "error": "That time slot is already booked. Please choose a different time."}
     except Exception as e:
-        # If freebusy check fails, log it but still try to create the event
-        import logging
-        logging.getLogger(__name__).warning(f"FreeBusy check failed: {e}")
+        logger.warning(f"FreeBusy check failed (proceeding anyway): {e}")
 
+    # create the event
     try:
-        created_event = service.events().insert(
-            calendarId=CALENDAR_ID,
-            body=event
-        ).execute()
-
+        event = service.events().insert(calendarId=CALENDAR_ID, body=event_body).execute()
         return {
             "success": True,
-            "event_id": created_event['id'],
-            "event_link": created_event.get('htmlLink', ''),
-            "summary": created_event['summary'],
-            "start": created_event['start']['dateTime'],
-            "end": created_event['end']['dateTime'],
-            "message": f"Successfully created '{meeting_title}' on {event_start.strftime('%B %d, %Y at %I:%M %p')}"
+            "event_id": event['id'],
+            "event_link": event.get('htmlLink', ''),
+            "summary": event['summary'],
+            "start": event['start']['dateTime'],
+            "end": event['end']['dateTime'],
+            "message": f"Created '{meeting_title}' on {start.strftime('%B %d, %Y at %I:%M %p')}"
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
