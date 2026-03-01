@@ -175,7 +175,9 @@ curl http://localhost:8000/
 # → {"status": "alive", "service": "Voice Scheduling Agent"}
 ```
 
-### Step 5: Connect to VAPI
+### Step 5: Connect to VAPI (only if setting up your own instance)
+
+> **Note:** If you just want to test the agent, use the [demo link](https://vapi.ai?demo=true&shareKey=2701445f-a21f-402c-b1d1-881af1ad5dbf&assistantId=fa66c2ac-b68d-4443-91f4-9a5272dd3fe2) at the top of this README. The steps below are only needed if you want to create your own voice assistant connected to your own calendar.
 
 1. Sign up at [vapi.ai](https://vapi.ai) and create a new **Assistant**
 2. Under the **Model** tab:
@@ -183,11 +185,11 @@ curl http://localhost:8000/
    - Add a system prompt instructing the assistant to collect name, date, time, and optional title
 3. Go to the **Tools** section → create a **Custom Tool**:
    - **Name:** `create_calendar_event`
-   - **Server URL:** your deployed URL + `/api/webhook` (e.g., `https://your-app.up.railway.app/api/webhook`)
+   - **Server URL:** your server URL + `/api/webhook`
    - **Parameters:** `name` (string, required), `date` (string, required), `time` (string, required), `title` (string, optional)
 4. Click **Publish** and test via the "Talk to Assistant" button
 
-> **Tip:** For local development, use [ngrok](https://ngrok.com) to expose your local server (`ngrok http 8000`) and use the ngrok URL as the tool's server URL in VAPI.
+> **Tip:** For local development, use [ngrok](https://ngrok.com) to expose your local server (`ngrok http 8000`) and use the ngrok URL as the tool's server URL.
 
 ---
 
