@@ -122,56 +122,72 @@ A Google Cloud **service account** is used for authentication — this allows th
 
 ---
 
-## 🚀 Running Locally (Optional)
+## 🚀 Running Locally
 
 ### Prerequisites
 
 - Python 3.11+
-- Google Cloud project with Calendar API enabled
-- Service account with calendar access
+- A [Google Cloud](https://console.cloud.google.com) account
+- A [VAPI](https://vapi.ai) account (free $10 credits on signup)
 
-### Steps
+### Step 1: Clone & Install
 
-1. **Clone the repo**
+```bash
+git clone https://github.com/madhav-051429/vikara-voice-agent.git
+cd vikara-voice-agent
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
-   ```bash
-   git clone https://github.com/madhav-051429/vikara-voice-agent.git
-   cd vikara-voice-agent
-   ```
+### Step 2: Set Up Google Calendar API
 
-2. **Set up virtual environment**
+1. Go to [Google Cloud Console](https://console.cloud.google.com) → create a new project
+2. Search for **"Google Calendar API"** in the top search bar → click **Enable**
+3. Go to **IAM & Admin** → **Service Accounts** → click **Create Service Account**
+4. Give it a name (e.g., `voice-agent`) → click **Done**
+5. Click on the created service account → go to **Keys** tab → **Add Key** → **Create new key** → select **JSON** → download it
+6. Rename the downloaded file to `credentials.json` and place it in the project folder
+7. Copy the service account email (looks like `voice-agent@your-project.iam.gserviceaccount.com`)
+8. Open [Google Calendar](https://calendar.google.com) → click the ⚙️ icon → **Settings** → under your calendar, click **Share with specific people** → **Add people** → paste the service account email → set permission to **"Make changes to events"** → click **Send**
 
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
+### Step 3: Configure Environment
 
-3. **Configure Google Calendar**
-   - Create a project in [Google Cloud Console](https://console.cloud.google.com)
-   - Enable the **Google Calendar API**
-   - Create a **Service Account** → download the JSON key as `credentials.json`
-   - Open Google Calendar → Settings → Share your calendar with the service account email → give **"Make changes to events"** permission
+Create a `.env` file in the project root:
 
-4. **Create `.env` file**
+```env
+GOOGLE_CALENDAR_ID=your-email@gmail.com
+GOOGLE_CREDENTIALS_PATH=credentials.json
+```
 
-   ```env
-   GOOGLE_CALENDAR_ID=your-email@gmail.com
-   GOOGLE_CREDENTIALS_PATH=credentials.json
-   ```
+> Replace `your-email@gmail.com` with the Gmail address associated with your Google Calendar.
 
-5. **Run the server**
+### Step 4: Run the Server
 
-   ```bash
-   uvicorn main:app --host 0.0.0.0 --port 8000
-   ```
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
 
-6. **Verify**
+Verify it's running:
 
-   ```bash
-   curl http://localhost:8000/
-   # → {"status": "alive", "service": "Vikara Voice Scheduling Agent"}
-   ```
+```bash
+curl http://localhost:8000/
+# → {"status": "alive", "service": "Voice Scheduling Agent"}
+```
+
+### Step 5: Connect to VAPI
+
+1. Sign up at [vapi.ai](https://vapi.ai) and create a new **Assistant**
+2. Under the **Model** tab:
+   - Set **Provider** to Google, **Model** to Gemini 2.0 Flash
+   - Add a system prompt instructing the assistant to collect name, date, time, and optional title
+3. Go to the **Tools** section → create a **Custom Tool**:
+   - **Name:** `create_calendar_event`
+   - **Server URL:** your deployed URL + `/api/webhook` (e.g., `https://your-app.up.railway.app/api/webhook`)
+   - **Parameters:** `name` (string, required), `date` (string, required), `time` (string, required), `title` (string, optional)
+4. Click **Publish** and test via the "Talk to Assistant" button
+
+> **Tip:** For local development, use [ngrok](https://ngrok.com) to expose your local server (`ngrok http 8000`) and use the ngrok URL as the tool's server URL in VAPI.
 
 ---
 
@@ -186,7 +202,7 @@ vikara-voice-agent/
 ├── runtime.txt           # Python version (3.11.6)
 ├── .env                  # Environment variables (not committed)
 ├── credentials.json      # Service account key (not committed)
-├── .gitignore            # Ignores .env, credentials, __pycache__
+├── .gitignore
 └── README.md
 ```
 
@@ -194,31 +210,32 @@ vikara-voice-agent/
 
 ## 📝 Environment Variables
 
-| Variable                   | Description                              | Required       |
-| -------------------------- | ---------------------------------------- | -------------- |
-| `GOOGLE_CALENDAR_ID`       | Target calendar ID (usually your email)  | Yes            |
-| `GOOGLE_CREDENTIALS_JSON`  | Service account JSON key (for Railway)   | Yes (deployed) |
-| `GOOGLE_CREDENTIALS_PATH`  | Path to credentials file (for local dev) | Yes (local)    |
-| `PORT`                     | Server port (default: 8000)              | No             |
+| Variable                  | Description                             | Required       |
+| ------------------------- | --------------------------------------- | -------------- |
+| `GOOGLE_CALENDAR_ID`      | Target calendar ID (usually your email) | Yes            |
+| `GOOGLE_CREDENTIALS_JSON` | Service account JSON key (for Railway)  | Yes (deployed) |
+| `GOOGLE_CREDENTIALS_PATH` | Path to credentials file (for local)    | Yes (local)    |
+| `PORT`                    | Server port (default: 8000)             | No             |
 
 ---
 
-## 🎯 Use Cases
+## 📋 Sample Call Log
 
-### Business Appointment Scheduling
+Below is a transcript from an actual test call showing the complete scheduling flow:
 
-A company (e.g., a law firm, clinic, or consultancy) deploys this voice agent on their phone line. When a **client calls in**:
-- The agent collects the client's name, preferred date/time, and meeting purpose
-- It checks the company's calendar for conflicts
-- If the slot is available, it books the appointment on the **company's Google Calendar**
-- The company sees "Meeting with [Client Name]" on their calendar and knows who's coming
+```
+Assistant: Hi! I'm the scheduling assistant. I can help you book a meeting.
+           Could I get your name, please?
+User:      My name is Madhav.
+Assistant: Thanks, Madhav. What date works best for you?
+User:      March twelfth.
+Assistant: And what time would you like to schedule it for?
+User:      3 PM.
+Assistant: Would you like to give this meeting a title?
+           If not, I'll just name it "Meeting with Madhav."
+User:      No, that's fine.
+Assistant: Just to confirm — "Meeting with Madhav"
+           on March 12th, 2026 at 3 PM. Does that sound right?
+User:      Yes.
 
-This eliminates the need for a receptionist to manually handle appointment scheduling.
-
-### Personal Voice Scheduler
-
-Use it as a personal assistant — call the agent and say *"Schedule a dentist appointment for next Monday at 2 PM"* and it gets added to your own Google Calendar.
-
-### Team Coordination
-
-Extend the agent to check availability across multiple team members' calendars before booking, ensuring no conflicts for group meetings.
+→ [create_calendar_event called — completed successfully]
