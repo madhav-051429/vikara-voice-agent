@@ -12,16 +12,12 @@ A real-time AI voice assistant that schedules meetings through natural conversat
 
 ### Testing the Voice Agent
 
-1. Go to the [VAPI Dashboard](https://dashboard.vapi.ai)
-2. Open the **"vikara Scheduling Assistant"**
-3. Click **"Talk to Assistant"** (green button, top-right)
-4. Have a voice conversation:
-   - The assistant will ask for your **name**
-   - Then your preferred **date** and **time**
-   - Optionally, a **meeting title**
-   - It will **confirm all details** before booking
-   - A real **Google Calendar event** is created automatically
-5. If the requested time slot is already booked, the agent will inform you and ask for a different time
+1. Open the [**Voice Agent Demo Link**](https://vapi.ai?demo=true&shareKey=2701445f-a21f-402c-b1d1-881af1ad5dbf&assistantId=fa66c2ac-b68d-4443-91f4-9a5272dd3fe2)
+2. Click the call button to start a voice conversation
+3. The assistant will ask for your **name**, **preferred date & time**, and an optional **meeting title**
+4. It will **confirm all details** before booking
+5. A real **Google Calendar event** is created automatically
+6. If the requested time slot is already booked, the agent will inform you and ask for a different time
 
 ### Testing the Backend Directly
 
