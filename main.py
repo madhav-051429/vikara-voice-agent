@@ -134,8 +134,7 @@ def _handle_create_event(parameters: dict) -> str:
         return (f"I've successfully created the meeting '{result['summary']}' on {result['start']}. "
                 f"The event has been added to the calendar. Is there anything else I can help you with?")
     else:
-        return (f"I'm sorry, I couldn't create the event. Error: {result.get('error', 'Unknown error')}. "
-                f"Could you please try again with a different date or time?")
+        return (f"Sorry, I couldn't create the event. {result.get('error', 'Unknown error')}.")
 
 
 if __name__ == "__main__":

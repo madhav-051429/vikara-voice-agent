@@ -116,7 +116,7 @@ def create_event(name: str, date: str, time: str, title: str = None) -> dict:
         if busy_slots:
             return {
                 "success": False,
-                "error": f"That time slot is already booked. There is an existing meeting on {event_start.strftime('%B %d, %Y')} between {event_start.strftime('%I:%M %p')} and {event_end.strftime('%I:%M %p')}. Please choose a different time."
+                "error": "That time slot is already booked. Please choose a different time."
             }
     except Exception as e:
         # If freebusy check fails, log it but still try to create the event
