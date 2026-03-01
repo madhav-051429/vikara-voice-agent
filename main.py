@@ -37,7 +37,8 @@ async def vapi_webhook(request: Request):
     Main webhook endpoint that VAPI calls.
 
     VAPI sends different types of messages:
-    - function-call: When the AI wants to execute a tool/function
+    - tool-calls: (NEW format) When the AI wants to execute a custom tool
+    - function-call: (OLD format) Legacy function calling
     - status-update: Call status changes
     - end-of-call-report: Summary after call ends
     """
@@ -48,41 +49,48 @@ async def vapi_webhook(request: Request):
         message = payload.get("message", {})
         message_type = message.get("type", "")
 
-        # Handle function calls from VAPI
-        if message_type == "function-call":
+        # Handle NEW tool-calls format (VAPI Tools)
+        if message_type == "tool-calls":
+            tool_call_list = message.get("toolCallList", [])
+            results = []
+
+            for tool_call in tool_call_list:
+                tool_call_id = tool_call.get("id", "")
+                function_info = tool_call.get("function", {})
+                function_name = function_info.get("name", "")
+                # Arguments can be a string (JSON) or dict
+                arguments = function_info.get("arguments", {})
+                if isinstance(arguments, str):
+                    arguments = json.loads(arguments)
+
+                logger.info(f"Tool call: {function_name} with args: {arguments}")
+
+                if function_name == "create_calendar_event":
+                    result = _handle_create_event(arguments)
+                    results.append({
+                        "toolCallId": tool_call_id,
+                        "result": result
+                    })
+                else:
+                    results.append({
+                        "toolCallId": tool_call_id,
+                        "result": f"Unknown tool: {function_name}"
+                    })
+
+            return JSONResponse({"results": results})
+
+        # Handle OLD function-call format (legacy, kept for backward compatibility)
+        elif message_type == "function-call":
             function_name = message.get("functionCall", {}).get("name", "")
             parameters = message.get("functionCall", {}).get("parameters", {})
 
             logger.info(f"Function call: {function_name} with params: {parameters}")
 
             if function_name == "create_calendar_event":
-                # Extract parameters
-                name = parameters.get("name", "Unknown")
-                date = parameters.get("date", "")
-                time = parameters.get("time", "")
-                title = parameters.get("title", None)
-
-                # Create the calendar event
-                result = create_event(name=name, date=date, time=time, title=title)
-
-                logger.info(f"Calendar result: {result}")
-
-                # Return result to VAPI — it will speak this to the user
-                if result.get("success"):
-                    return JSONResponse({
-                        "result": f"I've successfully created the meeting '{result['summary']}' on {result['start']}. "
-                                  f"The event has been added to the calendar. Is there anything else I can help you with?"
-                    })
-                else:
-                    return JSONResponse({
-                        "result": f"I'm sorry, I couldn't create the event. Error: {result.get('error', 'Unknown error')}. "
-                                  f"Could you please try again with a different date or time?"
-                    })
-
+                result_text = _handle_create_event(parameters)
+                return JSONResponse({"result": result_text})
             else:
-                return JSONResponse({
-                    "result": f"Unknown function: {function_name}"
-                })
+                return JSONResponse({"result": f"Unknown function: {function_name}"})
 
         # Handle status updates (optional — good for logging)
         elif message_type == "status-update":
@@ -110,6 +118,24 @@ async def vapi_webhook(request: Request):
             {"result": "An internal error occurred. Please try again."},
             status_code=500
         )
+
+
+def _handle_create_event(parameters: dict) -> str:
+    """Shared handler for creating calendar events (used by both tool-calls and function-call)."""
+    name = parameters.get("name", "Unknown")
+    date = parameters.get("date", "")
+    time_str = parameters.get("time", "")
+    title = parameters.get("title", None)
+
+    result = create_event(name=name, date=date, time=time_str, title=title)
+    logger.info(f"Calendar result: {result}")
+
+    if result.get("success"):
+        return (f"I've successfully created the meeting '{result['summary']}' on {result['start']}. "
+                f"The event has been added to the calendar. Is there anything else I can help you with?")
+    else:
+        return (f"I'm sorry, I couldn't create the event. Error: {result.get('error', 'Unknown error')}. "
+                f"Could you please try again with a different date or time?")
 
 
 if __name__ == "__main__":
