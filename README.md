@@ -59,13 +59,13 @@ User (Voice) ──► VAPI (STT + LLM + TTS) ──► FastAPI Webhook ──�
 | ---------------- | ----------------------------------- | ------------------------------------- |
 | Voice Platform   | VAPI                                | Orchestrates the full voice pipeline  |
 | Speech-to-Text   | Deepgram (via VAPI)                 | Converts speech to text               |
-| LLM              | Google Gemini 2.5 Flash (via VAPI)  | Powers conversation & function calls  |
+| LLM              | Google Gemini 2.0 Flash (via VAPI)  | Powers conversation & function calls  |
 | Text-to-Speech   | ElevenLabs (via VAPI)               | Converts responses to speech          |
 | Backend          | FastAPI (Python)                    | Webhook server & calendar integration |
 | Calendar         | Google Calendar API                 | Creates real calendar events          |
 | Hosting          | Railway                             | Deploys the backend server            |
 
-### Why Gemini 2.5 Flash?
+### Why Gemini 2.0 Flash?
 
 - **Low latency:** ~390ms Time to First Token — well under the 500ms threshold for natural conversation
 - **Fast generation:** 268 tokens/sec — over 2x faster than GPT-4o
