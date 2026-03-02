@@ -10,6 +10,8 @@ A real-time AI voice assistant that schedules meetings through natural conversat
 
 **Backend Server:** [https://web-production-9d71c.up.railway.app](https://web-production-9d71c.up.railway.app)
 
+**🎥 Demo Video:** [Watch the Loom walkthrough](https://www.loom.com/share/d7f1313895c742a38deac97aabbb9196)
+
 ### Testing the Voice Agent
 
 1. Open the [**Voice Agent Demo Link**](https://vapi.ai?demo=true&shareKey=2701445f-a21f-402c-b1d1-881af1ad5dbf&assistantId=fa66c2ac-b68d-4443-91f4-9a5272dd3fe2)
